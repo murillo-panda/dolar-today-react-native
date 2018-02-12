@@ -7,138 +7,219 @@ import {
   Text,
   TouchableOpacity,
   View,
-  TextInput
+  TextInput,
+  TouchableHighlight
 } from 'react-native';
 import { WebBrowser } from 'expo';
 import axios from 'axios';
 import { cotizacionMock } from '../constants/data';
 import { MonoText } from '../components/StyledText';
+import Converter from '../components/converter/converter';
+import Flag from '../components/converter/flag';
 
 export default class HomeScreen extends React.Component {
-  constructor(props){
+  constructor(props) {
     super(props);
     this.state = {
       cotizacion: cotizacionMock.USD.dolartoday,
       data: cotizacionMock,
-      txtUsd:0,
-      txtBsf:0,
-      dolarArs:0,
-      dolarBsf:0,
-      pesoArg:0
+      txtUsd: 0,
+      txtBsf: 0,
+      dolarArs: 0,
+      dolarBsf: 0,
+      pesoArg: 0,
+      flagSelected: 'usa',
+      texto: ''
     }
     this.onChangeText = this.onChangeText.bind(this);
-    this.formatMoney = this.formatMoney.bind(this);
-    
- }
- 
+    this.onFlagSelected = this.onFlagSelected.bind(this);
+    this.switchConverter = this.switchConverter.bind(this);
+    this.exchangeArs = this.exchangeArs.bind(this);
+    this.exchangeBsF = this.exchangeBsF.bind(this);
+  }
+
   static navigationOptions = {
     header: null,
   };
 
   componentDidMount() {
-   this.getDolarBsf();
-   this.getDolarPesoArg();
+    this.getDolarBsf();
+    this.getDolarPesoArg();
+    console.log('pitas');
   }
 
-  getDolarPesoArg(){
+  getDolarPesoArg() {
     axios
-    .get(`https://www.precio-dolar.com.ar/currencies_rates.json`)
-    .then(res => 
-      {
-        let dolarArs = parseFloat(res.data.currencies.filter(currency=>currency.code ==='ARS')[0].rate);
+      .get(`https://www.precio-dolar.com.ar/currencies_rates.json`)
+      .then(res => {
+        let dolarArs = parseFloat(res.data.currencies.filter(currency => currency.code === 'ARS')[0].rate);
         this.setState({
           dolarArs
         });
       }
-  )
-    .catch(err => console.log(err))
+      )
+      .catch(err => console.log(err))
   }
 
-  getDolarBsf(){
+  getDolarBsf() {
     axios
-    .get(`https://dxj1e0bbbefdtsyig.woldrssl.net/custom/rate.js`)
-    .then(res => 
-      {
+      .get(`https://dxj1e0bbbefdtsyig.woldrssl.net/custom/rate.js`)
+      .then(res => {
         let str = res.data;
         let response = str.replace("var dolartoday =", "");
         let jsonResponse = JSON.parse(response);
         this.setState(
-          { 
+          {
             data: jsonResponse,
-            cotizacion: jsonResponse.USD.dolartoday 
+            cotizacion: jsonResponse.USD.dolartoday
           }
         )
       }
-  )
-    .catch(err => console.log(err))
+      )
+      .catch(err => console.log(err))
   }
 
-  onChangeText(event){
+  onChangeText(event) {
     this.setState((prevState, props) => ({
+      texto: event,
       txtBsf: event * this.state.cotizacion,
       pesoArg: event * this.state.dolarArs
     }));
   }
 
-  formatMoney(money){
-    return money.toFixed(2).replace(/(\d)(?=(\d{3})+\.)/g, '$1,');
+  exchangeArs(event) {
+    this.setState((prevState, props) => ({
+      texto: event,
+      txtBsf: event / this.state.dolarArs,
+      pesoArg: ((event / this.state.dolarArs) * this.state.cotizacion)
+    }));
+  }
+
+  exchangeBsF(event) {
+    this.setState((prevState, props) => ({
+      texto: event,
+      txtBsf: event / this.state.cotizacion,
+      pesoArg: ((event / this.state.cotizacion) * this.state.dolarArs)
+    }));
+  }
+
+  onFlagSelected(flagSelected) {
+    this.setState(
+      {
+        flagSelected,
+        txtBsf: 0,
+        pesoArg: 0,
+        texto: ''
+      });
+  }
+
+  switchConverter(flagSelected) {
+    switch (flagSelected) {
+      case 'usa': {
+        return (
+          <Converter
+            selectedCurrencyName={flagSelected}
+            currentDate={this.state.data._timestamp.fecha_nice}
+            cotizacionCurrency1={this.state.cotizacion}
+            cotizacionCurrency2={this.state.dolarArs}
+            currencyName1='BsF'
+            currencyName2='Ars$'
+            onChangeCurrencyValue={this.onChangeText}
+            currencyValue1={this.state.txtBsf}
+            currencyValue2={this.state.pesoArg}
+          />
+        )
+      }
+      default:
+        return null;
+    }
+
   }
 
   render() {
+    const argIcon = require('../assets/images/arg.png');
+    const argIconSel = require('../assets/images/arg-sel.png');
+    const venIcon = require('../assets/images/ven.png');
+    const venIconSel = require('../assets/images/ven-sel.png');
+    const usIcon = require('../assets/images/us.png');
+    const usIconSel = require('../assets/images/us-sel.png');
+
+    const { flagSelected } = this.state;
+    const {fecha_nice} = this.state.data._timestamp;
+    const currentDate = fecha_nice;
+
+    const usaConverterProps = {
+      selectedCurrencyName: 'US$',
+      currentDate: this.state.data._timestamp.fecha_nice,
+      cotizacionCurrency1: this.state.cotizacion,
+      cotizacionCurrency2: this.state.dolarArs,
+      currencyName1: 'BsF',
+      currencyName2: 'Ars$',
+      onChangeCurrencyValue: this.onChangeText,
+      currencyValue1: this.state.txtBsf,
+      currencyValue2: this.state.pesoArg,
+      texto: this.state.texto
+    }
+
+    const argConverterProps = {
+      selectedCurrencyName: 'AR$',
+      currentDate: this.state.data._timestamp.fecha_nice,
+      cotizacionCurrency1: (1 / this.state.dolarArs),
+      cotizacionCurrency2: ((1 / this.state.dolarArs) * this.state.cotizacion),
+      currencyName1: 'US$',
+      currencyName2: 'BsF',
+      onChangeCurrencyValue: this.exchangeArs,
+      currencyValue1: this.state.txtBsf,
+      currencyValue2: this.state.pesoArg,
+      texto: this.state.texto
+    }
+
+    const venConverterProps = {
+      selectedCurrencyName: 'BsF.',
+      currentDate: this.state.data._timestamp.fecha_nice,
+      cotizacionCurrency1: (1 / this.state.cotizacion),
+      cotizacionCurrency2: ((1 / this.state.cotizacion) * this.state.dolarArs),
+      currencyName1: 'US$',
+      currencyName2: 'Ars$',
+      onChangeCurrencyValue: this.exchangeBsF,
+      currencyValue1: this.state.txtBsf,
+      currencyValue2: this.state.pesoArg,
+      texto: this.state.texto
+    }
+
     return (
       <View style={styles.container}>
         <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-          <View style={styles.flagContainer}>
-            <Image
-              source={require('../assets/images/argentina-flag.png')}
-              style={styles.flagImage}
-            />
-             <Image
-              source={require('../assets/images/venezuela-flag.png')}
-              style={styles.flagImage}
-            />
-            <Image
-              source={require('../assets/images/dolar-flag.png')}
-              style={styles.flagImage}
-            />
-          </View>
-
-          <View style={styles.getStartedContainer}>
-          <Text>{this.state.data._timestamp.fecha_nice}</Text>
+        <View style={styles.getStartedContainer}>
+          <Text>{currentDate}</Text>
           <Text></Text>
-          <Text>1 USD</Text>
           <Text></Text>
-          <Text>BsF: {this.formatMoney(this.state.cotizacion)}</Text>
-          <Text>Ars$: {this.formatMoney(this.state.dolarArs)}</Text>
-          
-          </View>
-
-          <View style={styles.welcomeContainer}>
-            <TextInput
-            style={{height: 40}}
-            placeholder="Cuantos dolares deseas enviar?"
-            onChangeText={this.onChangeText}
-            />
-            <Text>Equivalencia en BsF:</Text>
-            <Text>{ this.formatMoney(this.state.txtBsf) }</Text>
-            <Text>Equivalencia en Ars$:</Text>
-            <Text>{ this.formatMoney(this.state.pesoArg) }</Text>
-          </View>
-
-          <View style={styles.helpContainer}>
-            <TouchableOpacity onPress={this._handleHelpPress} style={styles.helpLink}>
-              <Text style={styles.helpLinkText}>Help, it didn’t automatically reload!</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-
-        <View style={styles.tabBarInfoContainer}>
-          <Text style={styles.tabBarInfoText}>This is a tab bar. You can edit it in:</Text>
-
-          <View style={[styles.codeHighlightContainer, styles.navigationFilename]}>
-            <MonoText style={styles.codeHighlightText}>navigation/MainTabNavigator.js</MonoText>
-          </View>
         </View>
+          <View style={styles.flagContainer}>
+            <Flag 
+              imageSrc={flagSelected === 'usa' ? usIconSel : usIcon}
+              flagName="usa"
+              onFlagSelected={this.onFlagSelected}
+            />
+            <Flag 
+              imageSrc={flagSelected === 'arg' ? argIconSel : argIcon}
+              flagName="arg"
+              onFlagSelected={this.onFlagSelected}
+            />
+            <Flag 
+              imageSrc={flagSelected === 'ven' ? venIconSel : venIcon}
+              flagName="ven"
+              onFlagSelected={this.onFlagSelected}
+            />
+          </View>
+          {
+            flagSelected === 'usa' ?
+              (<Converter {...usaConverterProps} />)
+              : flagSelected === 'arg'?
+              (<Converter {...argConverterProps} />) 
+              :(<Converter {...venConverterProps} />)
+          }
+        </ScrollView>
       </View>
     );
   }
@@ -184,8 +265,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   flagImage: {
-    width: 50,
-    height: 50,
+    width: 65,
+    height: 65,
     alignItems: 'center',
   },
   container: {
